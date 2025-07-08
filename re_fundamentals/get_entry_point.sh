@@ -11,8 +11,8 @@ if [ ! -f "$file_name" ]; then
     exit 1
 fi
 
-# Extract Magic Number (first 4 bytes)
-magic_number=$(xxd -p -l 4 "$file_name" | sed 's/../& /g')
+# Extract Magic Number (first 16 bytes)
+magic_number=$(hexdump -n 16 -v -e '16/1 "%02x " "\n"' "$file_name")
 magic_number="${magic_number%" "}"  # remove trailing space
 
 # Extract Class and trim spaces
@@ -27,10 +27,13 @@ else
     class="ELF32"
 fi
 
-# Extract Byte Order and trim spaces
-byte_order=$(readelf -h "$file_name" | grep 'Data:' | awk '{print $5, $6}')
-byte_order="${byte_order#"${byte_order%%[![:space:]]*}"}"
-byte_order="${byte_order%"${byte_order##*[![:space:]]}"}"
+# Extract full Byte Order line and trim
+full_byte_order=$(readelf -h "$file_name" | awk -F: '/Data:/ {print $2}')
+full_byte_order="${full_byte_order#"${full_byte_order%%[![:space:]]*}"}"
+full_byte_order="${full_byte_order%"${full_byte_order##*[![:space:]]}"}"
+
+# Extract only the endian part (usually last two words)
+byte_order=$(echo "$full_byte_order" | awk '{print $(NF-1), $NF}')
 
 # Extract Entry Point Address and trim spaces
 entry_point_address=$(readelf -h "$file_name" | awk -F: '/Entry point address:/ {print $2}')
